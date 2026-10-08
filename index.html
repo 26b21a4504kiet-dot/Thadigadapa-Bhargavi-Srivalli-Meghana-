@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Musical Instrument Frequency Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f0;--panel:#fff;--ink:#16252b;--mute:#5b6b72;--line:#d3dbd9;--wood:#2c1a15;--wood-ink:#f3e6d3;--brass:#c08a22;--teal:#1f7a74;--m1:#c08a22;--m2:#1f7a74;--m3:#b5472f;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10181b;--panel:#18242a;--ink:#e6eeee;--mute:#92a4a9;--line:#2a3a41;--wood:#1d110d;--teal:#4fb8b0;--m2:#4fb8b0;--m3:#e07a5f}}
+:root[data-theme="dark"]{--bg:#10181b;--panel:#18242a;--ink:#e6eeee;--mute:#92a4a9;--line:#2a3a41;--wood:#1d110d;--teal:#4fb8b0;--m2:#4fb8b0;--m3:#e07a5f}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Instrument Sans",system-ui,sans-serif}
+h1,h2{font-family:Fraunces,Georgia,serif;font-weight:700;line-height:1.1;margin:0}
+.hero{background:var(--wood);color:var(--wood-ink);padding:28px 20px 12px}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-size:clamp(28px,6vw,52px);letter-spacing:-.01em;max-width:16ch}
+.hero p{max-width:56ch;margin:12px 0 16px;opacity:.85}
+canvas{display:block;width:100%}
+#stage{height:230px}
+.chips{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0 18px}
+.chips label{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid #ffffff44;border-radius:99px;cursor:pointer;font-size:14px}
+.chips input{accent-color:var(--brass)}
+main{padding:24px 20px 60px}
+section{margin-top:34px}
+h2{font-size:26px;margin-bottom:6px}
+.sub{color:var(--mute);margin:0 0 14px;max-width:62ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.controls label{display:flex;flex-direction:column;gap:5px;font-size:14px;color:var(--mute)}
+.controls input,.controls select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
+.controls input[type=range]{padding:0;accent-color:var(--teal)}
+.controls b{color:var(--ink)}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}
+.readout div{border-left:3px solid var(--brass);padding-left:10px;font-size:14px;color:var(--mute)}
+.readout strong{display:block;font:700 22px Fraunces,Georgia,serif;color:var(--ink)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:560px;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mute);font-weight:600}
+tr.top td{background:color-mix(in srgb,var(--brass) 14%,transparent)}
+pre{margin:0;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow-x:auto}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.grid3 canvas{height:150px}
+.cap{font-size:14px;color:var(--mute);margin-top:6px}
+.cap b{color:var(--ink)}
+#spec{height:240px}
+.checks{display:grid;gap:6px;font-size:14px}
+.ok{color:var(--teal);font-weight:600}
+ol{padding-left:20px;max-width:66ch}
+li{margin-bottom:8px}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+<h1>Musical Instrument Frequency Analyzer</h1>
+<p>A guitar string modelled as masses joined by springs. The eigenvalues of its stiffness matrix are the squared frequencies, and the eigenvectors are the shapes the string vibrates in.</p>
+<canvas id="stage" aria-label="Animated vibrating string"></canvas>
+<div class="chips" role="group" aria-label="Modes to animate">
+<label><input type="checkbox" id="m1" checked> Fundamental</label>
+<label><input type="checkbox" id="m2" checked> 2nd harmonic</label>
+<label><input type="checkbox" id="m3"> 3rd harmonic</label>
+</div>
+</div></header>
+
+<main><div class="wrap">
+
+<section>
+<h2>Set up the string</h2>
+<p class="sub">Pick a benchmark guitar string or enter your own values. Everything below recalculates instantly.</p>
+<div class="panel">
+<div class="controls">
+<label>Benchmark string<select id="preset"></select></label>
+<label>Number of masses N: <b id="nv">12</b><input type="range" id="N" min="2" max="40" value="12"></label>
+<label>Length L (m)<input type="number" id="L" step="0.001" min="0.05"></label>
+<label>Linear density μ (kg/m)<input type="number" id="mu" step="0.00001" min="0.00001"></label>
+<label>Target pitch f₁ (Hz)<input type="number" id="f1" step="0.01" min="20"></label>
+</div>
+<div class="readout" id="readout"></div>
+</div>
+</section>
+
+<section>
+<h2>Step 1: The stiffness matrix</h2>
+<p class="sub">Newton's law for each mass gives m·xᵢ″ = k(xᵢ₊₁ − 2xᵢ + xᵢ₋₁). Collecting all N equations gives x″ = −(k/m)·K·x, where K is tridiagonal with 2 on the diagonal and −1 beside it.</p>
+<div class="panel"><pre id="matrix"></pre></div>
+</section>
+
+<section>
+<h2>Step 2: Eigenvalues and frequencies</h2>
+<p class="sub">Trying x = v·cos(ωt) turns the motion into Kv = λv, with ω² = (k/m)·λ and f = ω / 2π. The highlighted rows are the first three harmonics.</p>
+<div class="panel scroll"><table id="tbl"></table></div>
+<p class="cap">Error in cents compares each mode with the ideal continuous string, f = j·f₁. 100 cents is one semitone.</p>
+</section>
+
+<section>
+<h2>Step 3: The first three vibration modes</h2>
+<p class="sub">Each eigenvector gives the relative displacement of every mass. Dots are the N-mass model; the dashed line is a continuous string.</p>
+<div class="grid3">
+<div class="panel"><canvas id="c1"></canvas><div class="cap" id="t1"></div></div>
+<div class="panel"><canvas id="c2"></canvas><div class="cap" id="t2"></div></div>
+<div class="panel"><canvas id="c3"></canvas><div class="cap" id="t3"></div></div>
+</div>
+</section>
+
+<section>
+<h2>Frequency spectrum</h2>
+<p class="sub">Eigenvalue result against the ideal harmonics. High modes sag below the ideal because the beads cannot follow short wavelengths. Raise N to close the gap.</p>
+<div class="panel"><canvas id="spec"></canvas></div>
+</section>
+
+<section>
+<h2>Accuracy checks</h2>
+<div class="panel"><div class="checks" id="checks"></div></div>
+</section>
+
+<section>
+<h2>Assumptions</h2>
+<ol>
+<li>N equal masses m joined by N + 1 identical massless springs of stiffness k, both ends fixed.</li>
+<li>Small transverse vibrations, so Hooke's law holds, with no damping.</li>
+<li>A string of length L, tension T and density μ maps to spacing a = L/(N+1), m = μa and k = T/a.</li>
+<li>Tension comes from the ideal-string relation T = μ(2Lf₁)².</li>
+<li>Eigenpairs are found numerically with the Jacobi rotation method. The closed form λⱼ = 2 − 2cos(jπ/(N+1)) is used only to verify them.</li>
+</ol>
+</section>
+
+</div></main>
+
+<script>
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// Benchmark: standard-tuned electric guitar, .010 set (name, L m, mu kg/m, f1 Hz)
+const PRESETS=[["E4 · 1st string",0.648,3.98e-4,329.63],["B3 · 2nd string",0.648,6.73e-4,246.94],["G3 · 3rd string",0.648,1.15e-3,196.00],["D3 · 4th string",0.648,2.62e-3,146.83],["A2 · 5th string",0.648,4.96e-3,110.00],["E2 · 6th string",0.648,7.62e-3,82.41]];
+PRESETS.forEach((p,i)=>$("preset").add(new Option(p[0],i)));
+$("preset").onchange=()=>{const p=PRESETS[$("preset").value];$("L").value=p[1];$("mu").value=p[2];$("f1").value=p[3];update()};
+
+// Math engine: Jacobi rotations on the symmetric stiffness matrix
+function stiffness(N){return Array.from({length:N},(_,i)=>Array.from({length:N},(_,j)=>i===j?2:Math.abs(i-j)===1?-1:0))}
+function jacobi(M){
+  const n=M.length,A=M.map(r=>r.slice()),V=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>+(i===j)));
+  for(let sweep=0;sweep<80;sweep++){
+    let off=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)off+=A[i][j]**2;
+    if(off<1e-24)break;
+    for(let p=0;p<n-1;p++)for(let q=p+1;q<n;q++){
+      if(Math.abs(A[p][q])<1e-16)continue;
+      const th=(A[q][q]-A[p][p])/(2*A[p][q]);
+      const t=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1));
+      const c=1/Math.sqrt(t*t+1),s=t*c;
+      for(let k=0;k<n;k++){const a=A[k][p],b=A[k][q];A[k][p]=c*a-s*b;A[k][q]=s*a+c*b}
+      for(let k=0;k<n;k++){const a=A[p][k],b=A[q][k];A[p][k]=c*a-s*b;A[q][k]=s*a+c*b}
+      for(let k=0;k<n;k++){const a=V[k][p],b=V[k][q];V[k][p]=c*a-s*b;V[k][q]=s*a+c*b}
+    }
+  }
+  const idx=[...Array(n).keys()].sort((a,b)=>A[a][a]-A[b][b]);
+  return{lam:idx.map(i=>A[i][i]),vecs:idx.map(i=>V.map(r=>r[i]))};
+}
+function solve(N,L,mu,f1){
+  const T=mu*(2*L*f1)**2,a=L/(N+1),m=mu*a,k=T/a,K=stiffness(N);
+  const {lam,vecs}=jacobi(K);
+  const modes=vecs.map((v,j)=>{const s=v.reduce((acc,x,i)=>acc+x*Math.sin((i+1)*(j+1)*Math.PI/(N+1)),0);const mx=Math.max(...v.map(Math.abs));return v.map(x=>x*Math.sign(s||1)/mx)});
+  const freq=lam.map(l=>Math.sqrt(k/m*l)/(2*Math.PI));
+  const exact=lam.map((_,j)=>2-2*Math.cos((j+1)*Math.PI/(N+1)));
+  let err=0,res=0;
+  lam.forEach((l,j)=>{err=Math.max(err,Math.abs(l-exact[j]));const v=vecs[j];for(let i=0;i<N;i++){let kv=2*v[i]-(v[i-1]||0)-(v[i+1]||0);res=Math.max(res,Math.abs(kv-l*v[i]))}});
+  return{N,L,T,a,m,k,lam,freq,modes,err,res,f1};
+}
+
+let R=null;
+const fmt=(x,d=2)=>x.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+function setup(c){const d=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;const x=c.getContext("2d");x.setTransform(d,0,0,d,0,0);return[x,w,h]}
+
+function update(){
+  const N=+$("N").value,L=+$("L").value,mu=+$("mu").value,f1=+$("f1").value;
+  $("nv").textContent=N;
+  if(!(L>0&&mu>0&&f1>0))return;
+  R=solve(N,L,mu,f1);
+  $("readout").innerHTML=[["Tension T",fmt(R.T,1)+" N"],["Mass m",(R.m*1000).toExponential(2)+" g"],["Spring k",fmt(R.k,0)+" N/m"],["Spacing a",fmt(R.a*1000,1)+" mm"]].map(([a,b])=>`<div>${a}<strong>${b}</strong></div>`).join("");
+  const sz=Math.min(N,6);let m="";
+  for(let i=0;i<sz;i++){m+="[ "+Array.from({length:sz},(_,j)=>(i===j?" 2":Math.abs(i-j)===1?"-1":" 0")).join("  ")+(N>sz?"  …":"")+" ]\n"}
+  if(N>sz)m+="  ⋮   (showing "+sz+" of "+N+" rows and columns)";
+  $("matrix").textContent=m;
+  let t="<tr><th>Mode j</th><th>λ eigenvalue</th><th>ω² (rad²/s²)</th><th>f numeric (Hz)</th><th>f ideal (Hz)</th><th>Error (cents)</th></tr>";
+  for(let j=0;j<Math.min(N,8);j++){const id=f1*(j+1),c=1200*Math.log2(R.freq[j]/id);
+    t+=`<tr class="${j<3?"top":""}"><td>${j+1}</td><td>${fmt(R.lam[j],5)}</td><td>${fmt(R.lam[j]*R.k/R.m,0)}</td><td>${fmt(R.freq[j])}</td><td>${fmt(id)}</td><td>${(c>0?"+":"")+fmt(c)}</td></tr>`}
+  $("tbl").innerHTML=t;
+  for(let j=0;j<3;j++)$("t"+(j+1)).innerHTML=j<N?`<b>Mode ${j+1}</b>: ${fmt(R.freq[j])} Hz`:"Needs N ≥ "+(j+1);
+  $("checks").innerHTML=`<div>Max |λ numeric − λ exact|: <span class="ok">${R.err.toExponential(2)}</span></div><div>Max residual ‖Kv − λv‖: <span class="ok">${R.res.toExponential(2)}</span></div><div>Fundamental vs target pitch: <span class="ok">${fmt(100*(R.freq[0]/f1-1),3)}%</span> (within 1% for N ≥ 4)</div>`;
+  drawModes();drawSpec();
+}
+
+function drawModes(){
+  const cols=[css("--m1"),css("--m2"),css("--m3")];
+  for(let j=0;j<3;j++){
+    const [x,w,h]=setup($("c"+(j+1)));x.clearRect(0,0,w,h);
+    if(j>=R.N)continue;
+    const px=16,X=i=>px+(w-2*px)*i/(R.N+1),Y=v=>h/2-v*(h/2-14);
+    x.strokeStyle=css("--line");x.beginPath();x.moveTo(px,h/2);x.lineTo(w-px,h/2);x.stroke();
+    x.setLineDash([4,4]);x.strokeStyle=css("--mute");x.beginPath();
+    for(let s=0;s<=200;s++){const u=s/200;x[s?"lineTo":"moveTo"](px+(w-2*px)*u,Y(Math.sin((j+1)*Math.PI*u)))}x.stroke();x.setLineDash([]);
+    const ys=[0,...R.modes[j],0];
+    x.strokeStyle=cols[j];x.lineWidth=2.5;x.beginPath();ys.forEach((v,i)=>x[i?"lineTo":"moveTo"](X(i),Y(v)));x.stroke();
+    x.fillStyle=cols[j];ys.forEach((v,i)=>{x.beginPath();x.arc(X(i),Y(v),R.N>25?2.5:4,0,7);x.fill()});x.lineWidth=1;
+  }
+}
+
+function drawSpec(){
+  const [x,w,h]=setup($("spec"));x.clearRect(0,0,w,h);
+  const n=Math.min(R.N,8),pl=46,pb=28,pt=10,pw=w-pl-10,ph=h-pb-pt;
+  const mx=Math.max(R.f1*n,...R.freq.slice(0,n))*1.05;
+  x.font="12px Instrument Sans,sans-serif";x.fillStyle=css("--mute");x.strokeStyle=css("--line");
+  for(let g=0;g<=4;g++){const y=pt+ph-ph*g/4;x.beginPath();x.moveTo(pl,y);x.lineTo(w-10,y);x.stroke();x.textAlign="right";x.fillText(Math.round(mx*g/4),pl-6,y+4)}
+  const gw=pw/n,bw=Math.min(26,gw/2.6);
+  for(let j=0;j<n;j++){
+    const cx=pl+gw*(j+.5);
+    x.fillStyle=css("--teal");let b=ph*R.freq[j]/mx;x.fillRect(cx-bw-1,pt+ph-b,bw,b);
+    x.fillStyle=css("--brass");b=ph*R.f1*(j+1)/mx;x.fillRect(cx+1,pt+ph-b,bw,b);
+    x.fillStyle=css("--mute");x.textAlign="center";x.fillText("f"+(j+1),cx,h-9);
+  }
+  x.textAlign="left";x.fillStyle=css("--teal");x.fillRect(pl+8,pt+4,10,10);x.fillStyle=css("--ink");x.fillText("Eigenvalue result (Hz)",pl+24,pt+13);
+  x.fillStyle=css("--brass");x.fillRect(pl+170,pt+4,10,10);x.fillStyle=css("--ink");x.fillText("Ideal j·f₁",pl+186,pt+13);
+}
+
+// Hero: animated superposition of the chosen modes
+const still=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function frame(ts){
+  const [x,w,h]=setup($("stage"));x.clearRect(0,0,w,h);
+  if(R){
+    const t=still?0.1:ts/1000,px=10,cy=h/2,amp=h/2-22,N=R.N;
+    const sel=[1,2,3].filter(j=>$("m"+j).checked&&j<=N);
+    const X=i=>px+(w-2*px)*i/(N+1);
+    const ys=[0];for(let i=0;i<N;i++){let v=0;sel.forEach(j=>v+=R.modes[j-1][i]*Math.cos(2*Math.PI*(R.freq[j-1]/R.f1)*0.6*t)/sel.length);ys.push(v)}ys.push(0);
+    x.strokeStyle="#f3e6d344";x.beginPath();x.moveTo(px,cy);x.lineTo(w-px,cy);x.stroke();
+    x.strokeStyle="#e8c36a";x.lineWidth=2.5;x.beginPath();ys.forEach((v,i)=>x[i?"lineTo":"moveTo"](X(i),cy-v*amp*(sel.length>1?1.6:1)));x.stroke();
+    x.fillStyle="#f3e6d3";ys.forEach((v,i)=>{if(i&&i<=N){x.beginPath();x.arc(X(i),cy-v*amp*(sel.length>1?1.6:1),N>25?2.5:4.5,0,7);x.fill()}});
+    x.fillStyle="#8a5a3a";x.fillRect(px-4,cy-18,8,36);x.fillRect(w-px-4,cy-18,8,36);
+  }
+  if(!still)requestAnimationFrame(frame);
+}
+
+["N","L","mu","f1"].forEach(id=>$(id).addEventListener("input",update));
+["m1","m2","m3"].forEach(id=>$(id).addEventListener("change",()=>{if(still)requestAnimationFrame(frame)}));
+addEventListener("resize",()=>{if(R){drawModes();drawSpec();if(still)requestAnimationFrame(frame)}});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>R&&update());
+$("preset").value=0;$("preset").onchange();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
